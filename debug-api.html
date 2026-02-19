@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Debug - Response Check</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #333; }
+        .test-section { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .url { background: #f0f0f0; padding: 10px; border-radius: 4px; word-break: break-all; margin: 10px 0; }
+        .response { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; max-height: 500px; overflow-y: auto; }
+        .response pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; }
+        .status { display: inline-block; padding: 5px 10px; border-radius: 4px; font-weight: bold; margin: 10px 0; }
+        .status.success { background: #4caf50; color: white; }
+        .status.error { background: #f44336; color: white; }
+        .loading { color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 API Debug - Response Check</h1>
+        
+        <div class="test-section">
+            <h2>Test 1: Health Check</h2>
+            <div class="url">GET https://boatrace.shinta7023.workers.dev/api/health</div>
+            <div id="health-status" class="loading">Testing...</div>
+            <div id="health-response" class="response"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 2: 桐生（01） - 1R</h2>
+            <div class="url" id="kiryu-url">GET https://boatrace.shinta7023.workers.dev/api/odds/01/1?hd=20260218</div>
+            <div id="kiryu-status" class="loading">Testing...</div>
+            <div id="kiryu-response" class="response"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 3: 桐生（01） - 7R</h2>
+            <div class="url" id="kiryu7-url">GET https://boatrace.shinta7023.workers.dev/api/odds/01/7?hd=20260218</div>
+            <div id="kiryu7-status" class="loading">Testing...</div>
+            <div id="kiryu7-response" class="response"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 4: データ構造の確認</h2>
+            <div id="structure-analysis"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://boatrace.shinta7023.workers.dev';
+        const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+        async function testAPI(url, statusId, responseId) {
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                document.getElementById(statusId).innerHTML = 
+                    `<span class="status ${response.ok ? 'success' : 'error'}">
+                        HTTP ${response.status} ${response.ok ? 'OK' : 'ERROR'}
+                    </span>`;
+                
+                document.getElementById(responseId).innerHTML = 
+                    `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+                return { ok: response.ok, data: data };
+            } catch (error) {
+                document.getElementById(statusId).innerHTML = 
+                    `<span class="status error">ERROR: ${error.message}</span>`;
+                document.getElementById(responseId).innerHTML = 
+                    `<pre>Error: ${error.message}\n${error.stack}</pre>`;
+                return { ok: false, error: error.message };
+            }
+        }
+
+        async function analyzeStructure(data) {
+            let html = '<h3>データ構造解析</h3>';
+            
+            if (data && data.data && data.data.odds) {
+                const firstBoat = data.data.odds[0];
+                html += '<h4>オッズデータの構造:</h4>';
+                html += '<ul>';
+                html += `<li><strong>データ件数:</strong> ${data.data.odds.length}件</li>`;
+                html += `<li><strong>hasRace:</strong> ${data.data.hasRace}</li>`;
+                html += `<li><strong>raceNumber:</strong> ${data.data.raceNumber}</li>`;
+                html += '</ul>';
+                
+                html += '<h4>1号艇のデータフィールド:</h4>';
+                html += '<ul>';
+                for (const [key, value] of Object.entries(firstBoat)) {
+                    html += `<li><strong>${key}:</strong> ${value} (${typeof value})</li>`;
+                }
+                html += '</ul>';
+                
+                // レンジ形式かどうか判定
+                if (firstBoat.oddsMin !== undefined && firstBoat.oddsMax !== undefined) {
+                    html += '<p style="color: green; font-weight: bold;">✅ レンジ形式のオッズです</p>';
+                } else if (firstBoat.odds !== undefined) {
+                    html += '<p style="color: orange; font-weight: bold;">⚠️ 単一値のオッズです（レンジではない）</p>';
+                } else {
+                    html += '<p style="color: red; font-weight: bold;">❌ オッズデータが見つかりません</p>';
+                }
+                
+                // note フィールドの確認
+                if (data.data.note) {
+                    html += `<p style="color: red; font-weight: bold;">⚠️ モックデータ: ${data.data.note}</p>`;
+                }
+            } else {
+                html += '<p style="color: red;">❌ オッズデータが取得できませんでした</p>';
+            }
+            
+            document.getElementById('structure-analysis').innerHTML = html;
+        }
+
+        async function runTests() {
+            console.log('Starting API tests...');
+            
+            // Test 1: Health Check
+            await testAPI(`${API_BASE}/api/health`, 'health-status', 'health-response');
+            
+            // Test 2: 桐生 1R
+            await testAPI(`${API_BASE}/api/odds/01/1?hd=${today}`, 'kiryu-status', 'kiryu-response');
+            
+            // Test 3: 桐生 7R
+            const result = await testAPI(`${API_BASE}/api/odds/01/7?hd=${today}`, 'kiryu7-status', 'kiryu7-response');
+            
+            // Test 4: データ構造解析
+            if (result.ok && result.data) {
+                analyzeStructure(result.data);
+            }
+            
+            console.log('Tests completed!');
+        }
+
+        // ページ読み込み時にテスト実行
+        runTests();
+    </script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>メール送信テスト</title>
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            padding: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f5f5f5;
+        }
+        .success {
+            border-left: 5px solid #4CAF50;
+            background: #e8f5e9;
+        }
+        .error {
+            border-left: 5px solid #f44336;
+            background: #ffebee;
+        }
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+        .status {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .info-box {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 5px solid #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📧 メール送信テスト</h1>
+        <p class="subtitle">1号艇高オッズアラート機能のテスト</p>
+        
+        <div class="info-box">
+            <strong>📌 テスト内容:</strong><br>
+            Worker の <code>/api/send-alert</code> エンドポイントを呼び出して、<br>
+            Google Apps Script 経由でメールを送信します。<br>
+            <strong>送信先:</strong> shinta7023@gmail.com
+        </div>
+        
+        <button id="testBtn" onclick="testEmailSend()">🚀 テストメール送信</button>
+        <button onclick="testWithMultipleVenues()">📧 複数会場でテスト</button>
+        <button onclick="location.reload()">🔄 リセット</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function testEmailSend() {
+            const resultDiv = document.getElementById('result');
+            const btn = document.getElementById('testBtn');
+            
+            btn.disabled = true;
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = '<div class="status">📤 送信中...</div>';
+            
+            try {
+                const testData = {
+                    alerts: [
+                        { venue: 'テスト会場A', jcd: '01', race: 8, odds: '5.2-6.8' }
+                    ]
+                };
+                
+                console.log('送信データ:', testData);
+                
+                const response = await fetch('https://boatrace.shinta7023.workers.dev/api/send-alert', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const data = await response.json();
+                console.log('レスポンス:', data);
+                
+                if (data.success && data.data.emailSent) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <div class="status">✅ メール送信成功！</div>
+                        <p>shinta7023@gmail.com のメールボックスを確認してください。</p>
+                        <p><strong>送信件数:</strong> ${data.data.alertCount} 件</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+                        <div class="status">❌ メール送信失敗</div>
+                        <p>Worker またはGoogle Apps Script でエラーが発生しました。</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <div class="status">❌ エラー発生</div>
+                    <p>${error.message}</p>
+                    <pre>${error.stack}</pre>
+                `;
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+        
+        async function testWithMultipleVenues() {
+            const resultDiv = document.getElementById('result');
+            const btn = document.getElementById('testBtn');
+            
+            btn.disabled = true;
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = '<div class="status">📤 送信中...</div>';
+            
+            try {
+                const testData = {
+                    alerts: [
+                        { venue: '桐生', jcd: '01', race: 8, odds: '5.2-6.8' },
+                        { venue: '蒲郡', jcd: '07', race: 10, odds: '6.1-7.5' },
+                        { venue: '宮島', jcd: '17', race: 5, odds: '7.8-9.2' }
+                    ]
+                };
+                
+                console.log('送信データ:', testData);
+                
+                const response = await fetch('https://boatrace.shinta7023.workers.dev/api/send-alert', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const data = await response.json();
+                console.log('レスポンス:', data);
+                
+                if (data.success && data.data.emailSent) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <div class="status">✅ メール送信成功！</div>
+                        <p>複数会場（${data.data.alertCount}件）のアラートメールを送信しました。</p>
+                        <p>shinta7023@gmail.com のメールボックスを確認してください。</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+                        <div class="status">❌ メール送信失敗</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <div class="status">❌ エラー発生</div>
+                    <p>${error.message}</p>
+                    <pre>${error.stack}</pre>
+                `;
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

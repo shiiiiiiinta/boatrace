@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三国（10）デバッグ</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+        }
+        .success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 三国（10）デバッグ - 2/18開催</h1>
+    
+    <div class="section">
+        <h2>Step 1: レーススケジュール確認</h2>
+        <button onclick="checkSchedule()">スケジュール取得</button>
+        <div id="scheduleResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Step 2: 12Rオッズ確認</h2>
+        <button onclick="checkOdds()">12Rオッズ取得</button>
+        <div id="oddsResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Step 3: 公式サイト確認</h2>
+        <p>以下のURLを新しいタブで開いて確認してください：</p>
+        <ul>
+            <li><a href="https://www.boatrace.jp/owpc/pc/race/raceindex?jcd=10&hd=20260218" target="_blank">レース一覧（raceindex）</a></li>
+            <li><a href="https://www.boatrace.jp/owpc/pc/race/oddstf?jcd=10&rno=12&hd=20260218" target="_blank">12Rオッズ（oddstf）</a></li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>Step 4: フロントエンド動作確認</h2>
+        <button onclick="checkFrontend()">フロントエンドロジック実行</button>
+        <div id="frontendResult"></div>
+    </div>
+    
+    <script>
+        const API_BASE = 'https://boatrace.shinta7023.workers.dev';
+        const JCD = '10'; // 三国
+        const TEST_DATE = '20260218';
+        
+        async function checkSchedule() {
+            const resultDiv = document.getElementById('scheduleResult');
+            resultDiv.innerHTML = '<p>取得中...</p>';
+            
+            try {
+                const url = `${API_BASE}/api/race-schedule/${JCD}?hd=${TEST_DATE}`;
+                console.log('Fetching:', url);
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                console.log('Schedule data:', data);
+                
+                let html = '<div class="result ' + (data.success && data.data.hasSchedule ? 'success' : 'error') + '">';
+                html += `<strong>URL:</strong> ${url}<br>`;
+                html += `<strong>success:</strong> ${data.success}<br>`;
+                html += `<strong>hasSchedule:</strong> ${data.data?.hasSchedule}<br>`;
+                
+                if (data.data?.hasSchedule && data.data.races) {
+                    html += `<strong>レース数:</strong> ${data.data.races.length}<br>`;
+                    html += `<strong>レース一覧:</strong> ${data.data.races.map(r => r.raceNumber + 'R(' + r.limitTime + ')').join(', ')}<br>`;
+                } else {
+                    html += `<strong style="color: red;">⚠️ スケジュールなし</strong><br>`;
+                }
+                
+                html += '</div>';
+                html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result error">❌ エラー: ${error.message}</div>`;
+                console.error(error);
+            }
+        }
+        
+        async function checkOdds() {
+            const resultDiv = document.getElementById('oddsResult');
+            resultDiv.innerHTML = '<p>取得中...</p>';
+            
+            try {
+                const url = `${API_BASE}/api/odds/${JCD}/12?hd=${TEST_DATE}`;
+                console.log('Fetching:', url);
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                console.log('Odds data:', data);
+                
+                let html = '<div class="result ' + (data.success && data.data.hasRace ? 'success' : 'error') + '">';
+                html += `<strong>URL:</strong> ${url}<br>`;
+                html += `<strong>success:</strong> ${data.success}<br>`;
+                html += `<strong>hasRace:</strong> ${data.data?.hasRace}<br>`;
+                
+                if (data.data?.hasRace && data.data.odds) {
+                    html += `<strong>オッズ数:</strong> ${data.data.odds.length}<br>`;
+                    html += `<strong>1号艇:</strong> ${data.data.odds[0].oddsMin}〜${data.data.odds[0].oddsMax}<br>`;
+                } else {
+                    html += `<strong style="color: red;">⚠️ オッズデータなし</strong><br>`;
+                }
+                
+                html += '</div>';
+                html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result error">❌ エラー: ${error.message}</div>`;
+                console.error(error);
+            }
+        }
+        
+        async function checkFrontend() {
+            const resultDiv = document.getElementById('frontendResult');
+            resultDiv.innerHTML = '<p>実行中...</p>';
+            
+            try {
+                // フロントエンドと同じロジックを実行
+                const now = new Date();
+                const jstOffset = 9 * 60 * 60 * 1000;
+                const jstTime = new Date(now.getTime() + jstOffset);
+                const hours = jstTime.getUTCHours();
+                const jstDate = jstTime.toISOString().slice(0, 10).replace(/-/g, '');
+                
+                let targetDate, showOnlyRace12;
+                
+                if (hours >= 0 && hours < 8) {
+                    const yesterday = new Date(jstTime);
+                    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+                    targetDate = yesterday.toISOString().slice(0, 10).replace(/-/g, '');
+                    showOnlyRace12 = true;
+                } else if (hours >= 23) {
+                    targetDate = jstDate;
+                    showOnlyRace12 = true;
+                } else {
+                    targetDate = jstDate;
+                    showOnlyRace12 = false;
+                }
+                
+                let html = '<div class="result">';
+                html += `<strong>現在JST時刻:</strong> ${jstTime.toISOString()}<br>`;
+                html += `<strong>JST時:</strong> ${hours}時<br>`;
+                html += `<strong>targetDate:</strong> ${targetDate}<br>`;
+                html += `<strong>showOnlyRace12:</strong> ${showOnlyRace12}<br>`;
+                html += '</div>';
+                
+                // スケジュール取得
+                const scheduleUrl = `${API_BASE}/api/race-schedule/${JCD}?hd=${targetDate}`;
+                const scheduleRes = await fetch(scheduleUrl);
+                const scheduleData = await scheduleRes.json();
+                
+                html += '<div class="result ' + (scheduleData.success && scheduleData.data.hasSchedule ? 'success' : 'error') + '">';
+                html += `<strong>スケジュール:</strong> ${scheduleData.data?.hasSchedule ? 'あり' : 'なし'}<br>`;
+                
+                if (scheduleData.success && scheduleData.data.hasSchedule && scheduleData.data.races) {
+                    const races = scheduleData.data.races;
+                    html += `<strong>レース数:</strong> ${races.length}<br>`;
+                    
+                    if (showOnlyRace12) {
+                        html += `<strong>選択レース:</strong> 12R（強制）<br>`;
+                    } else {
+                        const now = Date.now();
+                        const upcomingRaces = races.filter(r => r.limitTimestamp > now);
+                        
+                        if (upcomingRaces.length === 0) {
+                            html += `<strong>選択レース:</strong> 12R（全終了）<br>`;
+                        } else {
+                            upcomingRaces.sort((a, b) => a.limitTimestamp - b.limitTimestamp);
+                            const bestRace = upcomingRaces[0];
+                            html += `<strong>選択レース:</strong> ${bestRace.raceNumber}R（締切: ${bestRace.limitTime}）<br>`;
+                        }
+                    }
+                    
+                    html += `<strong>結論:</strong> <span style="color: green; font-weight: bold;">三国は表示されるべき</span><br>`;
+                } else {
+                    html += `<strong>結論:</strong> <span style="color: red; font-weight: bold;">スケジュールが取得できないため表示されない</span><br>`;
+                }
+                
+                html += '</div>';
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result error">❌ エラー: ${error.message}</div>`;
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>

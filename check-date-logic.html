@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日付ロジック確認</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .info {
+            padding: 10px;
+            margin: 10px 0;
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+        }
+        .result {
+            padding: 10px;
+            margin: 10px 0;
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🕐 日付ロジック確認</h1>
+    
+    <div class="section">
+        <h2>現在の日時（JST）</h2>
+        <div id="currentTime" class="info"></div>
+    </div>
+    
+    <div class="section">
+        <h2>表示すべき日付とレース</h2>
+        <div id="logic" class="result"></div>
+    </div>
+    
+    <div class="section">
+        <h2>デバッグ情報</h2>
+        <pre id="debug"></pre>
+    </div>
+    
+    <script>
+        function checkDateLogic() {
+            // ブラウザのローカル時刻を取得
+            const now = new Date();
+            
+            // JST時刻を計算
+            const jstOffset = 9 * 60 * 60 * 1000; // 9時間（ミリ秒）
+            const jstTime = new Date(now.getTime() + jstOffset);
+            const hours = jstTime.getUTCHours();
+            const jstDate = jstTime.toISOString().slice(0, 10).replace(/-/g, '');
+            
+            // 前日の日付を計算
+            const yesterday = new Date(jstTime);
+            yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+            const yesterdayDate = yesterday.toISOString().slice(0, 10).replace(/-/g, '');
+            
+            // 現在時刻表示
+            document.getElementById('currentTime').innerHTML = `
+                <strong>ブラウザのローカル時刻</strong>: ${now.toLocaleString('ja-JP')}<br>
+                <strong>UTC時刻</strong>: ${now.toISOString()}<br>
+                <strong>JST時刻</strong>: ${jstTime.toISOString()}<br>
+                <strong>JST時</strong>: ${hours}時
+            `;
+            
+            // ロジック判定
+            let targetDate, showOnlyRace12, explanation;
+            
+            if (hours >= 0 && hours < 8) {
+                targetDate = yesterdayDate;
+                showOnlyRace12 = true;
+                explanation = `0:00-7:59（現在${hours}時）: <strong>前日（${yesterdayDate}）の12R結果を表示</strong>`;
+            } else if (hours >= 23) {
+                targetDate = jstDate;
+                showOnlyRace12 = true;
+                explanation = `23:00-23:59（現在${hours}時）: <strong>当日（${jstDate}）の12R結果を表示</strong>`;
+            } else {
+                targetDate = jstDate;
+                showOnlyRace12 = false;
+                explanation = `8:00-22:59（現在${hours}時）: <strong>当日（${jstDate}）の締切に最も近いレースを表示</strong>`;
+            }
+            
+            document.getElementById('logic').innerHTML = `
+                ${explanation}<br><br>
+                <strong>targetDate</strong>: ${targetDate}<br>
+                <strong>showOnlyRace12</strong>: ${showOnlyRace12}<br>
+                <strong>期待されるAPI呼び出し</strong>: /api/race-schedule/${targetDate}
+            `;
+            
+            // デバッグ情報
+            const debugInfo = {
+                browser_local: now.toString(),
+                utc: now.toISOString(),
+                jst: jstTime.toISOString(),
+                jst_hours: hours,
+                today_jst: jstDate,
+                yesterday_jst: yesterdayDate,
+                target_date: targetDate,
+                show_only_race12: showOnlyRace12
+            };
+            
+            document.getElementById('debug').textContent = JSON.stringify(debugInfo, null, 2);
+        }
+        
+        // 初回実行
+        checkDateLogic();
+        
+        // 1秒ごとに更新
+        setInterval(checkDateLogic, 1000);
+    </script>
+</body>
+</html>

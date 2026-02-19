@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最終確認テスト v2</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .venue {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 4px solid #007bff;
+            background: #f8f9fa;
+        }
+        .success { border-left-color: #28a745; background: #d4edda; }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+        .warning { border-left-color: #ffc107; background: #fff3cd; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover { background: #0056b3; }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 最終確認テスト v2</h1>
+    <p><strong>日付</strong>: 2026-02-18（昨日）</p>
+    <p><strong>API</strong>: https://boatrace.shinta7023.workers.dev</p>
+    
+    <div class="section">
+        <h2>Step 1: 問題の場を個別テスト</h2>
+        <button onclick="testVenue('04', '平和島')">平和島（04）</button>
+        <button onclick="testVenue('17', '宮島')">宮島（17）</button>
+        <button onclick="testVenue('20', '若松')">若松（20）</button>
+        <button onclick="testVenue('10', '三国')">三国（10）</button>
+        <button onclick="testVenue('01', '桐生')">桐生（01）</button>
+    </div>
+    
+    <div class="section">
+        <h2>Step 2: 全24場テスト</h2>
+        <button onclick="testAllVenues()">全24場を一括テスト</button>
+        <button onclick="clearResults()">結果クリア</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+        const API_BASE = 'https://boatrace.shinta7023.workers.dev';
+        const TEST_DATE = '20260218';
+        
+        const VENUES = {
+            '01': '桐生', '02': '戸田', '03': '江戸川', '04': '平和島',
+            '05': '多摩川', '06': '浜名湖', '07': '蒲郡', '08': '常滑',
+            '09': '津', '10': '三国', '11': 'びわこ', '12': '住之江',
+            '13': '尼崎', '14': '鳴門', '15': '丸亀', '16': '児島',
+            '17': '宮島', '18': '徳山', '19': '下関', '20': '若松',
+            '21': '芦屋', '22': '福岡', '23': '唐津', '24': '大村'
+        };
+        
+        async function testVenue(jcd, name) {
+            const resultsDiv = document.getElementById('results');
+            const venueDiv = document.createElement('div');
+            venueDiv.className = 'section';
+            venueDiv.innerHTML = `<h3>${name}（${jcd}）</h3><p>テスト中...</p>`;
+            resultsDiv.appendChild(venueDiv);
+            
+            try {
+                // Step 1: レーススケジュール取得
+                const scheduleUrl = `${API_BASE}/api/race-schedule/${jcd}?hd=${TEST_DATE}`;
+                console.log(`Fetching: ${scheduleUrl}`);
+                const scheduleRes = await fetch(scheduleUrl);
+                const scheduleData = await scheduleRes.json();
+                
+                let html = `<h3>${name}（${jcd}）</h3>`;
+                
+                // スケジュール結果
+                html += `<div class="venue ${scheduleData.success && scheduleData.data.hasSchedule ? 'success' : 'warning'}">`;
+                html += `<strong>📅 レーススケジュール</strong><br>`;
+                html += `URL: <code>${scheduleUrl}</code><br>`;
+                html += `success: ${scheduleData.success}<br>`;
+                html += `hasSchedule: ${scheduleData.data?.hasSchedule}<br>`;
+                
+                if (scheduleData.data?.hasSchedule && scheduleData.data.races) {
+                    html += `レース数: ${scheduleData.data.races.length}<br>`;
+                    const raceList = scheduleData.data.races.map(r => `${r.raceNumber}R(${r.limitTime})`).join(', ');
+                    html += `レース一覧: ${raceList}<br>`;
+                    html += `</div>`;
+                    
+                    // Step 2: 12Rのオッズ取得
+                    const oddsUrl = `${API_BASE}/api/odds/${jcd}/12?hd=${TEST_DATE}`;
+                    console.log(`Fetching: ${oddsUrl}`);
+                    const oddsRes = await fetch(oddsUrl);
+                    const oddsData = await oddsRes.json();
+                    
+                    html += `<div class="venue ${oddsData.success && oddsData.data.hasRace ? 'success' : 'error'}">`;
+                    html += `<strong>🎯 12Rオッズ</strong><br>`;
+                    html += `URL: <code>${oddsUrl}</code><br>`;
+                    html += `success: ${oddsData.success}<br>`;
+                    html += `hasRace: ${oddsData.data?.hasRace}<br>`;
+                    
+                    if (oddsData.data?.hasRace && oddsData.data.odds) {
+                        html += `オッズ数: ${oddsData.data.odds.length}<br>`;
+                        html += `1号艇: ${oddsData.data.odds[0].oddsMin}〜${oddsData.data.odds[0].oddsMax}<br>`;
+                        html += `<details><summary>詳細データ</summary><pre>${JSON.stringify(oddsData.data.odds, null, 2)}</pre></details>`;
+                    } else {
+                        html += `<span style="color: red;">❌ オッズデータなし</span><br>`;
+                        html += `<pre>${JSON.stringify(oddsData, null, 2)}</pre>`;
+                    }
+                    html += `</div>`;
+                    
+                } else {
+                    html += `<span style="color: orange;">⚠️ 開催なし</span>`;
+                    html += `</div>`;
+                }
+                
+                venueDiv.innerHTML = html;
+                
+            } catch (error) {
+                venueDiv.innerHTML = `<h3>${name}（${jcd}）</h3>
+                    <div class="venue error">❌ エラー: ${error.message}<br>
+                    <pre>${error.stack}</pre></div>`;
+                console.error(error);
+            }
+        }
+        
+        async function testAllVenues() {
+            clearResults();
+            const summary = {};
+            
+            for (const [jcd, name] of Object.entries(VENUES)) {
+                await testVenue(jcd, name);
+                await new Promise(r => setTimeout(r, 500)); // 0.5秒待機
+            }
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

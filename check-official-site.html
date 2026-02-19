@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>公式サイト直接確認</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .venue {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+        .venue h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        iframe {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .button-group {
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 BOATRACE公式サイト 直接確認</h1>
+    <p><strong>目的</strong>: 2026-02-18（昨日）の実際のデータを確認</p>
+    
+    <div class="button-group">
+        <h3>レース一覧（raceindex）を確認</h3>
+        <button onclick="loadRaceIndex('04', '平和島')">平和島（04）</button>
+        <button onclick="loadRaceIndex('17', '宮島')">宮島（17）</button>
+        <button onclick="loadRaceIndex('20', '若松')">若松（20）</button>
+        <button onclick="loadRaceIndex('10', '三国')">三国（10）</button>
+        <button onclick="loadRaceIndex('01', '桐生')">桐生（01）</button>
+    </div>
+    
+    <div class="button-group">
+        <h3>オッズ（oddstf）を確認</h3>
+        <button onclick="loadOdds('20', '4', '若松4R')">若松（20）4R</button>
+        <button onclick="loadOdds('20', '12', '若松12R')">若松（20）12R</button>
+        <button onclick="loadOdds('10', '12', '三国12R')">三国（10）12R</button>
+        <button onclick="loadOdds('01', '12', '桐生12R')">桐生（01）12R</button>
+    </div>
+    
+    <div id="content"></div>
+    
+    <script>
+        const TEST_DATE = '20260218'; // 2026-02-18
+        
+        function loadRaceIndex(jcd, name) {
+            const url = `https://www.boatrace.jp/owpc/pc/race/raceindex?jcd=${jcd}&hd=${TEST_DATE}`;
+            
+            document.getElementById('content').innerHTML = `
+                <div class="venue">
+                    <h3>${name}（${jcd}） - レース一覧</h3>
+                    <p><strong>URL:</strong> <a href="${url}" target="_blank">${url}</a></p>
+                    <p><strong>確認事項:</strong></p>
+                    <ul>
+                        <li>「本日の開催はございません」と表示されているか？</li>
+                        <li>1R〜12Rのリストが表示されているか？</li>
+                        <li>各レースの締切時刻（例: 08:47）が表示されているか？</li>
+                    </ul>
+                    <iframe src="${url}"></iframe>
+                </div>
+            `;
+        }
+        
+        function loadOdds(jcd, rno, name) {
+            const url = `https://www.boatrace.jp/owpc/pc/race/oddstf?jcd=${jcd}&rno=${rno}&hd=${TEST_DATE}`;
+            
+            document.getElementById('content').innerHTML = `
+                <div class="venue">
+                    <h3>${name}</h3>
+                    <p><strong>URL:</strong> <a href="${url}" target="_blank">${url}</a></p>
+                    <p><strong>確認事項:</strong></p>
+                    <ul>
+                        <li>1号艇〜6号艇のオッズ範囲（例: 1.0〜1.5）が表示されているか？</li>
+                        <li>各艇への投票票数と金額が表示されているか？</li>
+                        <li>「データがありません」と表示されているか？</li>
+                    </ul>
+                    <iframe src="${url}"></iframe>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

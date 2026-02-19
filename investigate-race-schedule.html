@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOATRACE 締切時刻調査</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .section {
+            background: #2d2d2d;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        h2 { color: #4ec9b0; }
+        pre {
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover { background: #005a9e; }
+        .url { color: #ce9178; }
+    </style>
+</head>
+<body>
+    <h1>🔍 BOATRACE 締切時刻データ調査</h1>
+    
+    <div class="section">
+        <h2>調査対象URL</h2>
+        <p>以下のエンドポイントから締切時刻を取得できるか調査します：</p>
+        
+        <h3>1. レース一覧ページ（今日の番組表）</h3>
+        <p class="url">https://www.boatrace.jp/owpc/pc/race/racelist?jcd=10&hd=20260218</p>
+        <button onclick="testURL('racelist')">テスト実行</button>
+        <pre id="result1">まだ実行されていません</pre>
+        
+        <h3>2. レース前情報ページ</h3>
+        <p class="url">https://www.boatrace.jp/owpc/pc/race/beforeinfo?jcd=10&rno=1&hd=20260218</p>
+        <button onclick="testURL('beforeinfo')">テスト実行</button>
+        <pre id="result2">まだ実行されていません</pre>
+        
+        <h3>3. 出走表ページ</h3>
+        <p class="url">https://www.boatrace.jp/owpc/pc/race/racelist?rno=1&jcd=10&hd=20260218</p>
+        <button onclick="testURL('raceindex')">テスト実行</button>
+        <pre id="result3">まだ実行されていません</pre>
+        
+        <h3>4. JSON API（もしあれば）</h3>
+        <p class="url">https://www.boatrace.jp/owpc/pc/data/race?jcd=10&hd=20260218</p>
+        <button onclick="testURL('json')">テスト実行</button>
+        <pre id="result4">まだ実行されていません</pre>
+    </div>
+    
+    <div class="section">
+        <h2>Worker経由テスト</h2>
+        <p>Cloudflare Worker経由で取得を試みます（CORS回避）</p>
+        <button onclick="testViaWorker()">Worker経由でテスト</button>
+        <pre id="workerResult">まだ実行されていません</pre>
+    </div>
+
+    <script>
+        async function testURL(type) {
+            const urls = {
+                'racelist': 'https://www.boatrace.jp/owpc/pc/race/racelist?jcd=10&hd=20260218',
+                'beforeinfo': 'https://www.boatrace.jp/owpc/pc/race/beforeinfo?jcd=10&rno=1&hd=20260218',
+                'raceindex': 'https://www.boatrace.jp/owpc/pc/race/raceindex?jcd=10&hd=20260218',
+                'json': 'https://www.boatrace.jp/owpc/pc/data/race?jcd=10&hd=20260218'
+            };
+            
+            const resultIds = {
+                'racelist': 'result1',
+                'beforeinfo': 'result2',
+                'raceindex': 'result3',
+                'json': 'result4'
+            };
+            
+            const resultEl = document.getElementById(resultIds[type]);
+            resultEl.textContent = '取得中...\n';
+            
+            try {
+                // CORS制限があるため、直接アクセスは失敗する可能性が高い
+                const response = await fetch(urls[type], { mode: 'no-cors' });
+                resultEl.textContent = 'CORS制限により内容を直接確認できません。\n';
+                resultEl.textContent += 'Worker経由でのアクセスが必要です。\n\n';
+                resultEl.textContent += '次のステップ: Worker経由でテスト\n';
+                resultEl.textContent += 'または、ブラウザで直接URLを開いてHTMLを確認してください:\n';
+                resultEl.textContent += urls[type];
+            } catch (error) {
+                resultEl.textContent = `エラー: ${error.message}\n\n`;
+                resultEl.textContent += 'CORS制限のため、Worker経由でのアクセスが必要です。';
+            }
+        }
+        
+        async function testViaWorker() {
+            const resultEl = document.getElementById('workerResult');
+            resultEl.textContent = '取得中...\n';
+            
+            try {
+                // Worker に新しいエンドポイントを追加して、締切時刻を取得
+                // まずは既存のオッズエンドポイントで取得できるか確認
+                
+                resultEl.textContent = '現在、Worker には締切時刻取得のエンドポイントがありません。\n\n';
+                resultEl.textContent += '次のステップ:\n';
+                resultEl.textContent += '1. Worker に /api/race-schedule/:jcd エンドポイントを追加\n';
+                resultEl.textContent += '2. BOATRACE公式サイトのHTML/JSONから締切時刻をパース\n';
+                resultEl.textContent += '3. 各レースの締切時刻を返す\n\n';
+                resultEl.textContent += 'まず、公式サイトのHTMLを手動で確認する必要があります。\n';
+                resultEl.textContent += 'ブラウザで以下を開いてください:\n';
+                resultEl.textContent += 'https://www.boatrace.jp/owpc/pc/race/racelist?jcd=10&hd=20260218\n\n';
+                resultEl.textContent += 'HTML内に締切時刻（例: "10:45" など）が含まれているか確認してください。';
+                
+            } catch (error) {
+                resultEl.textContent = `エラー: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

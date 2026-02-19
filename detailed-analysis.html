@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Detailed API Analysis</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .test { background: white; padding: 20px; margin: 10px 0; border-radius: 8px; }
+        table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #667eea; color: white; }
+        .pass { color: green; font-weight: bold; }
+        .fail { color: red; font-weight: bold; }
+        .warn { color: orange; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🔬 詳細API分析</h1>
+    
+    <div class="test">
+        <h2>三国（10）12R - 詳細</h2>
+        <div id="mikuni-summary"></div>
+        <table id="mikuni-table">
+            <thead>
+                <tr>
+                    <th>艇番</th>
+                    <th>オッズMin</th>
+                    <th>オッズMax</th>
+                    <th>票数</th>
+                    <th>金額</th>
+                </tr>
+            </thead>
+            <tbody id="mikuni-tbody"></tbody>
+        </table>
+    </div>
+
+    <div class="test">
+        <h2>桐生（01）9R - 詳細</h2>
+        <div id="kiryu-summary"></div>
+        <table id="kiryu-table">
+            <thead>
+                <tr>
+                    <th>艇番</th>
+                    <th>オッズMin</th>
+                    <th>オッズMax</th>
+                    <th>票数</th>
+                    <th>金額</th>
+                </tr>
+            </thead>
+            <tbody id="kiryu-tbody"></tbody>
+        </table>
+    </div>
+
+    <div class="test">
+        <h2>戸田（02）1R - 詳細</h2>
+        <div id="toda-summary"></div>
+    </div>
+
+    <script>
+        async function analyzeVenue(jcd, rno, prefix) {
+            try {
+                const url = `https://boatrace.shinta7023.workers.dev/api/odds/${jcd}/${rno}?hd=20260218`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                const summaryDiv = document.getElementById(`${prefix}-summary`);
+                
+                if (!data.success) {
+                    summaryDiv.innerHTML = `<span class="fail">❌ API失敗: ${data.error}</span>`;
+                    return;
+                }
+                
+                if (!data.data.hasRace) {
+                    summaryDiv.innerHTML = `<span class="warn">⚠️ レース開催なし</span>`;
+                    return;
+                }
+                
+                const odds = data.data.odds;
+                const totalTickets = odds.reduce((sum, b) => sum + (b.voteTickets || 0), 0);
+                
+                summaryDiv.innerHTML = `
+                    <div><strong>レース:</strong> ${data.data.raceNumber}R</div>
+                    <div><strong>艇数:</strong> ${odds.length}</div>
+                    <div><strong>合計票数:</strong> ${totalTickets}票</div>
+                    <div><strong>タイムスタンプ:</strong> ${data.data.timestamp}</div>
+                `;
+                
+                const tbody = document.getElementById(`${prefix}-tbody`);
+                if (tbody) {
+                    tbody.innerHTML = odds.map(boat => `
+                        <tr>
+                            <td>${boat.boatNumber}号艇</td>
+                            <td>${boat.oddsMin !== undefined ? boat.oddsMin : '-'}</td>
+                            <td>${boat.oddsMax !== undefined ? boat.oddsMax : '-'}</td>
+                            <td>${boat.voteTickets || 0}</td>
+                            <td>${boat.voteAmount || 0}円</td>
+                        </tr>
+                    `).join('');
+                }
+                
+                // 三国12Rの検証
+                if (jcd === '10' && rno === '12') {
+                    let result = '<div style="margin-top: 15px; padding: 10px; background: #f0f0f0; border-radius: 4px;">';
+                    result += '<h3>検証結果:</h3>';
+                    
+                    const boat1 = odds[0];
+                    if (boat1 && boat1.oddsMin === 1.0 && boat1.oddsMax === 1.5) {
+                        result += '<div class="pass">✅ 1号艇オッズ 1.0-1.5: PASS</div>';
+                    } else {
+                        result += `<div class="fail">❌ 1号艇オッズ: ${boat1 ? boat1.oddsMin + '-' + boat1.oddsMax : 'N/A'} (期待値: 1.0-1.5)</div>`;
+                    }
+                    
+                    if (totalTickets === 180) {
+                        result += '<div class="pass">✅ 合計180票: PASS</div>';
+                    } else {
+                        result += `<div class="fail">❌ 合計${totalTickets}票 (期待値: 180票)</div>`;
+                    }
+                    
+                    result += '</div>';
+                    summaryDiv.innerHTML += result;
+                }
+                
+            } catch (error) {
+                document.getElementById(`${prefix}-summary`).innerHTML = 
+                    `<span class="fail">❌ エラー: ${error.message}</span>`;
+            }
+        }
+
+        async function runTests() {
+            await analyzeVenue('10', '12', 'mikuni');
+            await new Promise(r => setTimeout(r, 1000));
+            await analyzeVenue('01', '9', 'kiryu');
+            await new Promise(r => setTimeout(r, 1000));
+            await analyzeVenue('02', '1', 'toda');
+        }
+
+        runTests();
+    </script>
+</body>
+</html>

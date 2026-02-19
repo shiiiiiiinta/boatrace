@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Direct API Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; }
+        .section { margin: 20px 0; padding: 15px; background: white; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <h1>Direct API Response Test</h1>
+    
+    <div class="section">
+        <h2>三国（10）12R</h2>
+        <pre id="mikuni-response"></pre>
+    </div>
+
+    <div class="section">
+        <h2>桐生（01）9R</h2>
+        <pre id="kiryu-response"></pre>
+    </div>
+
+    <div class="section">
+        <h2>戸田（02）1R</h2>
+        <pre id="toda-response"></pre>
+    </div>
+
+    <script>
+        async function fetchAndDisplay(jcd, rno, elementId) {
+            try {
+                const url = `https://boatrace.shinta7023.workers.dev/api/odds/${jcd}/${rno}?hd=20260218`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                const element = document.getElementById(elementId);
+                element.textContent = JSON.stringify(data, null, 2);
+                
+                console.log(`${jcd}-${rno}:`, data);
+            } catch (error) {
+                document.getElementById(elementId).textContent = `Error: ${error.message}`;
+            }
+        }
+
+        fetchAndDisplay('10', '12', 'mikuni-response');
+        setTimeout(() => fetchAndDisplay('01', '9', 'kiryu-response'), 2000);
+        setTimeout(() => fetchAndDisplay('02', '1', 'toda-response'), 4000);
+    </script>
+</body>
+</html>

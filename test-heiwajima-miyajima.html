@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>平和島・宮島 データ確認</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .venue-test {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 平和島（04）・宮島（17）データ確認</h1>
+    
+    <div class="test-section">
+        <h2>現在時刻情報</h2>
+        <div class="info">
+            <strong>現在時刻:</strong> <span id="currentTime"></span><br>
+            <strong>時間帯:</strong> <span id="timeZone"></span><br>
+            <strong>取得する日付:</strong> <span id="targetDate"></span>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>テストボタン</h2>
+        <button onclick="testVenue('04', '平和島')">平和島（04）テスト</button>
+        <button onclick="testVenue('17', '宮島')">宮島（17）テスト</button>
+        <button onclick="testBothVenues()">両方同時テスト</button>
+        <button onclick="testAllRaces('04', '平和島')">平和島 全レーステスト</button>
+        <button onclick="testAllRaces('17', '宮島')">宮島 全レーステスト</button>
+    </div>
+
+    <div class="test-section">
+        <h2>テスト結果</h2>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://boatrace.shinta7023.workers.dev';
+        
+        // 現在時刻情報の更新
+        function updateTimeInfo() {
+            const now = new Date();
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+            const seconds = now.getSeconds();
+            
+            document.getElementById('currentTime').textContent = 
+                `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            
+            let timeZone = '';
+            let targetDate;
+            
+            if (hours >= 0 && hours < 8) {
+                timeZone = '深夜時間帯（0:00-7:59）→ 前日の12Rを表示';
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                targetDate = yesterday.toISOString().slice(0, 10).replace(/-/g, '');
+            } else if (hours >= 8 && hours < 18) {
+                timeZone = 'レース時間帯（8:00-17:59）→ 締切に最も近いレースを表示';
+                targetDate = now.toISOString().slice(0, 10).replace(/-/g, '');
+            } else {
+                timeZone = 'レース終了後（18:00-23:59）→ 今日の12Rを表示';
+                targetDate = now.toISOString().slice(0, 10).replace(/-/g, '');
+            }
+            
+            document.getElementById('timeZone').textContent = timeZone;
+            document.getElementById('targetDate').textContent = targetDate;
+        }
+        
+        updateTimeInfo();
+        setInterval(updateTimeInfo, 1000);
+        
+        // 日付とレース番号の決定
+        function getTargetDateAndRace() {
+            const now = new Date();
+            const hours = now.getHours();
+            
+            let targetDate, forcedRaceNumber;
+            if (hours >= 0 && hours < 8) {
+                // 深夜〜早朝は前日の12Rを強制表示
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                targetDate = yesterday.toISOString().slice(0, 10).replace(/-/g, '');
+                forcedRaceNumber = 12;
+            } else {
+                // レース時間帯は今日の日付
+                targetDate = now.toISOString().slice(0, 10).replace(/-/g, '');
+                forcedRaceNumber = null;
+            }
+            
+            return { targetDate, forcedRaceNumber };
+        }
+        
+        // 個別会場テスト
+        async function testVenue(jcd, venueName) {
+            const resultsDiv = document.getElementById('results');
+            const { targetDate, forcedRaceNumber } = getTargetDateAndRace();
+            
+            const testDiv = document.createElement('div');
+            testDiv.className = 'venue-test';
+            testDiv.innerHTML = `
+                <h3>🏁 ${venueName}（${jcd}）のテスト <span class="loading"></span></h3>
+                <div id="venue-${jcd}-status">テスト中...</div>
+            `;
+            resultsDiv.insertBefore(testDiv, resultsDiv.firstChild);
+            
+            const statusDiv = document.getElementById(`venue-${jcd}-status`);
+            
+            try {
+                // ステップ1: レーススケジュール取得
+                statusDiv.innerHTML += '<div class="info">📅 レーススケジュール取得中...</div>';
+                const scheduleUrl = `${API_BASE_URL}/api/race-schedule/${jcd}?hd=${targetDate}`;
+                console.log(`[${jcd}] Schedule URL:`, scheduleUrl);
+                
+                const scheduleResponse = await fetch(scheduleUrl);
+                const scheduleData = await scheduleResponse.json();
+                
+                console.log(`[${jcd}] Schedule data:`, scheduleData);
+                
+                if (scheduleData.success && scheduleData.data && scheduleData.data.hasSchedule) {
+                    statusDiv.innerHTML += `<div class="success">✅ スケジュール取得成功: ${scheduleData.data.races.length}レース</div>`;
+                    statusDiv.innerHTML += `<pre>${JSON.stringify(scheduleData.data.races.slice(0, 3), null, 2)}</pre>`;
+                } else {
+                    statusDiv.innerHTML += `<div class="error">❌ スケジュール取得失敗または開催なし</div>`;
+                    statusDiv.innerHTML += `<pre>${JSON.stringify(scheduleData, null, 2)}</pre>`;
+                }
+                
+                // ステップ2: レース番号決定
+                let raceNumber;
+                if (forcedRaceNumber) {
+                    raceNumber = forcedRaceNumber;
+                    statusDiv.innerHTML += `<div class="info">🌙 深夜時間帯のため強制的に12Rを選択</div>`;
+                } else if (scheduleData.success && scheduleData.data && scheduleData.data.hasSchedule) {
+                    const races = scheduleData.data.races;
+                    const now = Date.now();
+                    const upcomingRaces = races.filter(r => r.limitTimestamp > now);
+                    
+                    if (upcomingRaces.length === 0) {
+                        raceNumber = 12;
+                        statusDiv.innerHTML += `<div class="info">🏁 全レース終了のため12Rを選択</div>`;
+                    } else {
+                        upcomingRaces.sort((a, b) => a.limitTimestamp - b.limitTimestamp);
+                        raceNumber = upcomingRaces[0].raceNumber;
+                        statusDiv.innerHTML += `<div class="info">⏰ 締切に最も近い${raceNumber}Rを選択（締切: ${upcomingRaces[0].limitTime}）</div>`;
+                    }
+                } else {
+                    raceNumber = 12;
+                    statusDiv.innerHTML += `<div class="info">⚠️ スケジュール取得失敗のため12Rをフォールバック</div>`;
+                }
+                
+                // ステップ3: オッズデータ取得
+                statusDiv.innerHTML += `<div class="info">💰 ${raceNumber}Rのオッズデータ取得中...</div>`;
+                const oddsUrl = `${API_BASE_URL}/api/odds/${jcd}/${raceNumber}?hd=${targetDate}`;
+                console.log(`[${jcd}] Odds URL:`, oddsUrl);
+                
+                const oddsResponse = await fetch(oddsUrl);
+                const oddsData = await oddsResponse.json();
+                
+                console.log(`[${jcd}] Odds data:`, oddsData);
+                
+                if (oddsData.success && oddsData.data && oddsData.data.hasRace && oddsData.data.odds) {
+                    statusDiv.innerHTML += `<div class="success">✅ オッズデータ取得成功: ${oddsData.data.odds.length}艇</div>`;
+                    statusDiv.innerHTML += `<pre>${JSON.stringify(oddsData.data, null, 2)}</pre>`;
+                } else {
+                    statusDiv.innerHTML += `<div class="error">❌ オッズデータ取得失敗</div>`;
+                    statusDiv.innerHTML += `<pre>${JSON.stringify(oddsData, null, 2)}</pre>`;
+                }
+                
+                // ローディング削除
+                testDiv.querySelector('.loading').remove();
+                
+            } catch (error) {
+                statusDiv.innerHTML += `<div class="error">❌ エラー発生: ${error.message}</div>`;
+                console.error(`[${jcd}] Error:`, error);
+                testDiv.querySelector('.loading').remove();
+            }
+        }
+        
+        // 両方同時テスト
+        async function testBothVenues() {
+            await testVenue('04', '平和島');
+            await testVenue('17', '宮島');
+        }
+        
+        // 全レーステスト
+        async function testAllRaces(jcd, venueName) {
+            const resultsDiv = document.getElementById('results');
+            const { targetDate } = getTargetDateAndRace();
+            
+            const testDiv = document.createElement('div');
+            testDiv.className = 'venue-test';
+            testDiv.innerHTML = `
+                <h3>🔍 ${venueName}（${jcd}）全レーステスト <span class="loading"></span></h3>
+                <div id="allraces-${jcd}-status">テスト中...</div>
+            `;
+            resultsDiv.insertBefore(testDiv, resultsDiv.firstChild);
+            
+            const statusDiv = document.getElementById(`allraces-${jcd}-status`);
+            
+            try {
+                for (let rno = 1; rno <= 12; rno++) {
+                    const oddsUrl = `${API_BASE_URL}/api/odds/${jcd}/${rno}?hd=${targetDate}`;
+                    console.log(`[${jcd}-${rno}] Testing:`, oddsUrl);
+                    
+                    const response = await fetch(oddsUrl);
+                    const data = await response.json();
+                    
+                    if (data.success && data.data && data.data.hasRace && data.data.odds) {
+                        statusDiv.innerHTML += `<div class="success">✅ ${rno}R: データあり（${data.data.odds.length}艇）</div>`;
+                    } else {
+                        statusDiv.innerHTML += `<div class="error">❌ ${rno}R: データなし</div>`;
+                    }
+                }
+                
+                testDiv.querySelector('.loading').remove();
+                
+            } catch (error) {
+                statusDiv.innerHTML += `<div class="error">❌ エラー発生: ${error.message}</div>`;
+                console.error(`[${jcd}] Error:`, error);
+                testDiv.querySelector('.loading').remove();
+            }
+        }
+    </script>
+</body>
+</html>

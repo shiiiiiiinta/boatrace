@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>最終確認テスト</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .test { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .pass { color: green; font-weight: bold; font-size: 18px; }
+        .fail { color: red; font-weight: bold; font-size: 18px; }
+        table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: #667eea; color: white; }
+        .highlight { background: #ffffcc; }
+        h1 { color: #333; }
+        h2 { color: #667eea; }
+    </style>
+</head>
+<body>
+    <h1>🎯 最終確認テスト - 3項目検証</h1>
+    
+    <div class="test">
+        <h2>✓ 検証項目1: 三国12Rの合計票数 = 180票</h2>
+        <div id="check1-status">確認中...</div>
+        <div id="check1-table"></div>
+    </div>
+
+    <div class="test">
+        <h2>✓ 検証項目2: 三国12Rの1号艇オッズ = 1.0-1.5</h2>
+        <div id="check2-status">確認中...</div>
+    </div>
+
+    <div class="test">
+        <h2>✓ 検証項目3: 戸田・平和島は非開催</h2>
+        <div id="check3-status">確認中...</div>
+    </div>
+
+    <div class="test" id="final-result" style="display:none; background: #e8f5e9;">
+        <h2>📊 最終結果</h2>
+        <div id="final-message" style="font-size: 24px; padding: 20px;"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://boatrace.shinta7023.workers.dev';
+        let check1 = false, check2 = false, check3 = false;
+
+        async function verifyMikuni12R() {
+            try {
+                const response = await fetch(`${API_BASE}/api/odds/10/12?hd=20260218`);
+                const data = await response.json();
+                
+                if (!data.success || !data.data || !data.data.hasRace || !data.data.odds) {
+                    document.getElementById('check1-status').innerHTML = '<div class="fail">❌ データ取得失敗</div>';
+                    document.getElementById('check2-status').innerHTML = '<div class="fail">❌ データ取得失敗</div>';
+                    return;
+                }
+                
+                const odds = data.data.odds;
+                const totalTickets = odds.reduce((sum, b) => sum + (b.voteTickets || 0), 0);
+                
+                // テーブル表示
+                let table = '<table><tr><th>艇番</th><th>オッズ範囲</th><th>票数</th><th>金額</th></tr>';
+                odds.forEach((b, i) => {
+                    const highlight = i === 0 ? ' class="highlight"' : '';
+                    table += `<tr${highlight}>`;
+                    table += `<td>${b.boatNumber}号艇</td>`;
+                    table += `<td>${b.oddsMin}-${b.oddsMax}</td>`;
+                    table += `<td>${(b.voteTickets || 0).toLocaleString()}票</td>`;
+                    table += `<td>${((b.voteAmount || 0) / 10000).toFixed(0)}万円</td>`;
+                    table += '</tr>';
+                });
+                table += `<tr style="background: #f0f0f0; font-weight: bold;"><td colspan="2">合計</td><td>${totalTickets}票</td><td>-</td></tr>`;
+                table += '</table>';
+                document.getElementById('check1-table').innerHTML = table;
+                
+                // Check 1: 合計180票
+                if (totalTickets === 180) {
+                    document.getElementById('check1-status').innerHTML = 
+                        `<div class="pass">✅ PASS: 合計票数 = ${totalTickets}票</div>`;
+                    check1 = true;
+                } else {
+                    document.getElementById('check1-status').innerHTML = 
+                        `<div class="fail">❌ FAIL: 合計票数 = ${totalTickets}票 (期待値: 180票)</div>`;
+                }
+                
+                // Check 2: 1号艇オッズ 1.0-1.5
+                const boat1 = odds[0];
+                if (boat1 && boat1.oddsMin === 1.0 && boat1.oddsMax === 1.5) {
+                    document.getElementById('check2-status').innerHTML = 
+                        `<div class="pass">✅ PASS: 1号艇オッズ = ${boat1.oddsMin}-${boat1.oddsMax}</div>`;
+                    check2 = true;
+                } else {
+                    document.getElementById('check2-status').innerHTML = 
+                        `<div class="fail">❌ FAIL: 1号艇オッズ = ${boat1.oddsMin}-${boat1.oddsMax} (期待値: 1.0-1.5)</div>`;
+                }
+                
+            } catch (error) {
+                document.getElementById('check1-status').innerHTML = `<div class="fail">❌ エラー: ${error.message}</div>`;
+                document.getElementById('check2-status').innerHTML = `<div class="fail">❌ エラー: ${error.message}</div>`;
+            }
+        }
+
+        async function verifyNonRacing() {
+            try {
+                const toda = await fetch(`${API_BASE}/api/odds/02/1?hd=20260218`).then(r => r.json());
+                const heiwa = await fetch(`${API_BASE}/api/odds/04/1?hd=20260218`).then(r => r.json());
+                
+                const todaOK = toda.success && toda.data && !toda.data.hasRace;
+                const heiwaOK = heiwa.success && heiwa.data && !heiwa.data.hasRace;
+                
+                let status = '<div>';
+                status += todaOK ? '<div class="pass">✅ 戸田: 非開催</div>' : '<div class="fail">❌ 戸田: 開催中と判定</div>';
+                status += heiwaOK ? '<div class="pass">✅ 平和島: 非開催</div>' : '<div class="fail">❌ 平和島: 開催中と判定</div>';
+                status += '</div>';
+                
+                document.getElementById('check3-status').innerHTML = status;
+                
+                check3 = todaOK && heiwaOK;
+                
+            } catch (error) {
+                document.getElementById('check3-status').innerHTML = `<div class="fail">❌ エラー: ${error.message}</div>`;
+            }
+        }
+
+        async function showFinalResult() {
+            const finalDiv = document.getElementById('final-result');
+            const finalMsg = document.getElementById('final-message');
+            
+            finalDiv.style.display = 'block';
+            
+            if (check1 && check2 && check3) {
+                finalDiv.style.background = '#e8f5e9';
+                finalMsg.innerHTML = '<div class="pass">🎉 全項目 PASS！<br>本番データの取得に成功しました！</div>';
+            } else {
+                finalDiv.style.background = '#ffebee';
+                finalMsg.innerHTML = '<div class="fail">⚠️ 一部の項目が失敗しました<br>詳細は上記をご確認ください</div>';
+            }
+        }
+
+        async function runAllTests() {
+            await verifyMikuni12R();
+            await new Promise(r => setTimeout(r, 2000));
+            await verifyNonRacing();
+            await new Promise(r => setTimeout(r, 1000));
+            await showFinalResult();
+        }
+
+        runAllTests();
+    </script>
+</body>
+</html>
