@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Worker データ詳細確認</title>
+</head>
+<body>
+    <h1>Worker データ詳細確認</h1>
+    <pre id="output"></pre>
+
+    <script>
+        async function check() {
+            const output = document.getElementById('output');
+            output.textContent = '取得中...\n';
+            
+            try {
+                const response = await fetch('https://boatrace.shinta7023.workers.dev/api/odds/10/12?hd=20260218');
+                const data = await response.json();
+                
+                let text = '=== Worker レスポンス ===\n\n';
+                text += JSON.stringify(data, null, 2);
+                text += '\n\n=== 検証 ===\n\n';
+                
+                if (data.success && data.data && data.data.odds) {
+                    const odds = data.data.odds;
+                    let totalVotes = 0;
+                    let totalAmount = 0;
+                    
+                    text += '各艇データ:\n';
+                    odds.forEach(boat => {
+                        const votes = boat.voteTickets || 0;
+                        const amount = boat.voteAmount || 0;
+                        totalVotes += votes;
+                        totalAmount += amount;
+                        
+                        text += `  ${boat.boatNumber}号艇: ${votes}票, ${amount}円\n`;
+                    });
+                    
+                    text += `\n総投票数: ${totalVotes} 票 (期待: 180)\n`;
+                    text += `総金額: ${totalAmount} 円 (期待: 18000)\n`;
+                    
+                    if (totalVotes === 0 && totalAmount === 0) {
+                        text += '\n❌ 結論: Workerは票数・金額データを取得できていません\n';
+                        text += '\n考えられる原因:\n';
+                        text += '1. BOATRACE公式サイトが複勝の投票データを提供していない\n';
+                        text += '2. HTMLパース処理が公式サイトの構造と合っていない\n';
+                        text += '3. 複勝オッズページには投票データが含まれていない\n';
+                        text += '\n次のステップ:\n';
+                        text += '公式サイトを直接確認する必要があります:\n';
+                        text += 'https://www.boatrace.jp/owpc/pc/race/oddstf?jcd=10&rno=12&hd=20260218\n';
+                    } else {
+                        text += `\n✅ データ取得成功！\n`;
+                    }
+                } else {
+                    text += '❌ オッズデータがありません\n';
+                }
+                
+                output.textContent = text;
+                console.log('Full data:', JSON.stringify(data, null, 2));
+                console.log('data.data:', data.data);
+                console.log('odds:', data.data?.odds);
+                if (data.data?.odds) {
+                    data.data.odds.forEach(boat => {
+                        console.log(`Boat ${boat.boatNumber}:`, boat);
+                    });
+                }
+                
+            } catch (error) {
+                output.textContent = `エラー: ${error.message}\n${error.stack}`;
+                console.error(error);
+            }
+        }
+        
+        check();
+    </script>
+</body>
+</html>

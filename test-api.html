@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test - Current Race Data</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .info { margin: 20px 0; padding: 10px; background: #f0f0f0; border-radius: 5px; }
+        .venue { margin: 10px 0; padding: 10px; background: #fff; border: 1px solid #ddd; }
+        .odds { font-size: 14px; color: #666; }
+    </style>
+</head>
+<body>
+    <h1>Race Data Test</h1>
+    <div class="info">
+        <strong>Current Time:</strong> <span id="currentTime"></span><br>
+        <strong>API URL:</strong> <span id="apiUrl"></span>
+    </div>
+    <div id="results"></div>
+
+    <script type="module">
+        import CONFIG from './js/config.js';
+        
+        document.getElementById('currentTime').textContent = new Date().toLocaleString('ja-JP');
+        document.getElementById('apiUrl').textContent = CONFIG.API_BASE_URL;
+        
+        const resultsDiv = document.getElementById('results');
+        
+        // 桐生（01）のデータを取得してテスト
+        const jcd = '01';
+        const today = new Date();
+        const hd = today.toISOString().slice(0, 10).replace(/-/g, '');
+        
+        async function testRace(rno) {
+            const url = `${CONFIG.API_BASE_URL}/api/odds/${jcd}/${rno}?hd=${hd}`;
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                const venueDiv = document.createElement('div');
+                venueDiv.className = 'venue';
+                
+                if (data.success && data.data && data.data.hasRace && data.data.odds) {
+                    venueDiv.innerHTML = `
+                        <strong>桐生 ${rno}R</strong> - ✅ データ取得成功<br>
+                        <div class="odds">
+                            ${data.data.odds.map(o => `
+                                ${o.boatNumber}号艇: ${o.odds} (${o.voteTickets}票 / ${(o.voteAmount / 10000).toFixed(0)}万円)
+                            `).join('<br>')}
+                        </div>
+                        ${data.data.note ? `<div style="color: orange; margin-top: 5px;">⚠️ ${data.data.note}</div>` : ''}
+                    `;
+                } else {
+                    venueDiv.innerHTML = `<strong>桐生 ${rno}R</strong> - ❌ レース未開催またはデータなし`;
+                }
+                
+                resultsDiv.appendChild(venueDiv);
+                
+            } catch (error) {
+                const venueDiv = document.createElement('div');
+                venueDiv.className = 'venue';
+                venueDiv.innerHTML = `<strong>桐生 ${rno}R</strong> - ❌ エラー: ${error.message}`;
+                resultsDiv.appendChild(venueDiv);
+            }
+        }
+        
+        // 1R〜12Rまで順番にテスト
+        async function runTests() {
+            for (let rno = 1; rno <= 12; rno++) {
+                await testRace(rno);
+                await new Promise(resolve => setTimeout(resolve, 1000)); // 1秒待機
+            }
+        }
+        
+        runTests();
+    </script>
+</body>
+</html>

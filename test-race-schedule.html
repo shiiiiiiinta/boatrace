@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>締切時刻ベースのレース選択テスト</title>
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        h1 { color: #333; margin-bottom: 10px; }
+        .subtitle { color: #666; margin-bottom: 30px; }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+        }
+        button:hover { transform: translateY(-2px); }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f5f5f5;
+        }
+        .success { border-left: 5px solid #4CAF50; }
+        .error { border-left: 5px solid #f44336; }
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+        .venue-test {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .venue-test button {
+            font-size: 14px;
+            padding: 10px;
+        }
+        .info-box {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 5px solid #2196F3;
+        }
+        .time-info {
+            background: #fff3e0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 5px solid #ff9800;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⏰ 締切時刻ベースのレース選択テスト</h1>
+        <p class="subtitle">BOATRACE公式サイトから締切時刻を取得し、最適なレースを選択</p>
+        
+        <div class="time-info">
+            <strong>現在時刻:</strong> <span id="currentTime"></span><br>
+            <strong>日付:</strong> <span id="currentDate"></span>
+        </div>
+        
+        <div class="info-box">
+            <strong>📌 テスト内容:</strong><br>
+            1. Worker の `/api/race-schedule/:jcd` エンドポイントから締切時刻を取得<br>
+            2. 締切前かつ締切に最も近いレースを選択<br>
+            3. 全レース終了している場合は12Rを表示
+        </div>
+        
+        <h3>個別会場テスト</h3>
+        <button onclick="testVenue('10')">三国 (10)</button>
+        <button onclick="testVenue('01')">桐生 (01)</button>
+        <button onclick="testVenue('24')">大村 (24)</button>
+        
+        <h3>全会場一括テスト</h3>
+        <button onclick="testAllVenues()">全24場のレース選択をテスト</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://boatrace.shinta7023.workers.dev';
+        
+        // 現在時刻を表示
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleString('ja-JP');
+            document.getElementById('currentDate').textContent = now.toISOString().slice(0, 10).replace(/-/g, '');
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+        
+        async function testVenue(jcd) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = '<p>テスト中...</p>';
+            
+            try {
+                const hd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                
+                // 締切時刻を取得
+                const scheduleResponse = await fetch(`${API_BASE}/api/race-schedule/${jcd}?hd=${hd}`);
+                const scheduleData = await scheduleResponse.json();
+                
+                let html = `<h3>会場コード: ${jcd}</h3>`;
+                html += `<pre>${JSON.stringify(scheduleData, null, 2)}</pre>`;
+                
+                if (scheduleData.success && scheduleData.data && scheduleData.data.hasSchedule) {
+                    const races = scheduleData.data.races;
+                    const now = Date.now();
+                    
+                    html += `<h4>レーススケジュール</h4>`;
+                    html += `<table style="width: 100%; border-collapse: collapse;">`;
+                    html += `<tr style="background: #f0f0f0;"><th>レース</th><th>締切時刻</th><th>ステータス</th></tr>`;
+                    
+                    races.forEach(race => {
+                        const isPast = race.limitTimestamp < now;
+                        const status = isPast ? '終了' : '締切前';
+                        const color = isPast ? '#f44336' : '#4CAF50';
+                        
+                        html += `<tr style="border-bottom: 1px solid #ddd;">`;
+                        html += `<td style="padding: 8px;">${race.raceNumber}R</td>`;
+                        html += `<td style="padding: 8px;">${race.limitTime}</td>`;
+                        html += `<td style="padding: 8px; color: ${color}; font-weight: bold;">${status}</td>`;
+                        html += `</tr>`;
+                    });
+                    
+                    html += `</table>`;
+                    
+                    // 締切前のレースを抽出
+                    const upcomingRaces = races.filter(r => r.limitTimestamp > now);
+                    
+                    if (upcomingRaces.length === 0) {
+                        html += `<div style="margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 5px;">`;
+                        html += `<strong>📌 選択結果:</strong> 全レース終了 → <strong>12R</strong> を表示`;
+                        html += `</div>`;
+                    } else {
+                        const bestRace = upcomingRaces[0];
+                        html += `<div style="margin-top: 20px; padding: 15px; background: #d4edda; border-radius: 5px;">`;
+                        html += `<strong>📌 選択結果:</strong> <strong>${bestRace.raceNumber}R</strong> を表示<br>`;
+                        html += `締切時刻: ${bestRace.limitTime}`;
+                        html += `</div>`;
+                    }
+                    
+                    resultDiv.className = 'result success';
+                } else {
+                    html += `<p style="color: #f44336;">締切時刻データの取得に失敗しました</p>`;
+                    resultDiv.className = 'result error';
+                }
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<p>エラー: ${error.message}</p><pre>${error.stack}</pre>`;
+            }
+        }
+        
+        async function testAllVenues() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = '<p>全24場をテスト中...</p>';
+            
+            const venues = [
+                '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12',
+                '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24'
+            ];
+            
+            const venueNames = {
+                '01': '桐生', '02': '戸田', '03': '江戸川', '04': '平和島',
+                '05': '多摩川', '06': '浜名湖', '07': '蒲郡', '08': '常滑',
+                '09': '津', '10': '三国', '11': 'びわこ', '12': '住之江',
+                '13': '尼崎', '14': '鳴門', '15': '丸亀', '16': '児島',
+                '17': '宮島', '18': '徳山', '19': '下関', '20': '若松',
+                '21': '芦屋', '22': '福岡', '23': '唐津', '24': '大村'
+            };
+            
+            try {
+                const hd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                const now = Date.now();
+                
+                let html = '<h3>全24場のレース選択結果</h3>';
+                html += '<table style="width: 100%; border-collapse: collapse;">';
+                html += '<tr style="background: #f0f0f0;"><th>会場</th><th>選択レース</th><th>理由</th></tr>';
+                
+                for (const jcd of venues) {
+                    try {
+                        const response = await fetch(`${API_BASE}/api/race-schedule/${jcd}?hd=${hd}`);
+                        const data = await response.json();
+                        
+                        let selectedRace = '-';
+                        let reason = '-';
+                        
+                        if (data.success && data.data && data.data.hasSchedule && data.data.races) {
+                            const races = data.data.races;
+                            const upcomingRaces = races.filter(r => r.limitTimestamp > now);
+                            
+                            if (upcomingRaces.length === 0) {
+                                selectedRace = '12R';
+                                reason = '全レース終了';
+                            } else {
+                                const bestRace = upcomingRaces[0];
+                                selectedRace = `${bestRace.raceNumber}R`;
+                                reason = `締切 ${bestRace.limitTime}`;
+                            }
+                        } else {
+                            reason = 'スケジュール取得失敗';
+                        }
+                        
+                        html += `<tr style="border-bottom: 1px solid #ddd;">`;
+                        html += `<td style="padding: 8px;">${venueNames[jcd]} (${jcd})</td>`;
+                        html += `<td style="padding: 8px; font-weight: bold;">${selectedRace}</td>`;
+                        html += `<td style="padding: 8px;">${reason}</td>`;
+                        html += `</tr>`;
+                        
+                    } catch (error) {
+                        html += `<tr style="border-bottom: 1px solid #ddd;">`;
+                        html += `<td style="padding: 8px;">${venueNames[jcd]} (${jcd})</td>`;
+                        html += `<td style="padding: 8px; color: #f44336;">エラー</td>`;
+                        html += `<td style="padding: 8px; color: #f44336;">${error.message}</td>`;
+                        html += `</tr>`;
+                    }
+                }
+                
+                html += '</table>';
+                
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<p>エラー: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

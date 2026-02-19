@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>競艇複勝オッズ - 全場リアルタイム表示</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- ローディング表示（コンテンツ上部に移動） -->
+        <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+            <div class="loading-banner">
+                <div class="spinner-small"></div>
+                <span>更新中...</span>
+            </div>
+        </div>
+
+        <header class="header">
+            <h1><i class="fas fa-ship"></i> 競艇複勝オッズ - 全場表示</h1>
+            <div class="header-info">
+                <div class="update-info">
+                    <span class="last-update">最終更新: <span id="lastUpdate">-</span></span>
+                    <span class="next-update">次回更新: <span id="nextUpdate">-</span></span>
+                </div>
+                <button id="refreshBtn" class="refresh-btn">
+                    <i class="fas fa-sync-alt"></i> 今すぐ更新
+                </button>
+            </div>
+        </header>
+
+        <div class="error-message" id="errorMessage" style="display: none;">
+            <i class="fas fa-exclamation-triangle"></i>
+            <p id="errorText"></p>
+        </div>
+
+        <div class="venue-grid" id="venueGrid">
+            <!-- 競艇場のカードがここに動的に生成されます -->
+        </div>
+
+        <footer class="footer">
+            <p>※ オッズ情報は8:00-18:00の間、5分ごとに自動更新されます（それ以外は手動更新のみ）</p>
+            <p>※ 複勝とは、選択した艇が1着または2着に入る賭け方です</p>
+            <p>※ 1号艇のオッズが5.0倍を超えた場合、アラートが表示されます</p>
+        </footer>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

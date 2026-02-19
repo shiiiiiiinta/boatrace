@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #f5f5f5; }
+        .test { background: white; padding: 20px; margin: 10px 0; border-radius: 8px; }
+        .pass { color: green; font-weight: bold; }
+        .fail { color: red; font-weight: bold; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+        h2 { color: #333; }
+    </style>
+</head>
+<body>
+    <h1>🔍 本番データ検証テスト</h1>
+    
+    <div class="test">
+        <h2>Test 1: 三国（10）12R - 複勝オッズ</h2>
+        <div id="test1-result"></div>
+        <pre id="test1-data"></pre>
+    </div>
+
+    <div class="test">
+        <h2>Test 2: 戸田（02）1R - 非開催確認</h2>
+        <div id="test2-result"></div>
+        <pre id="test2-data"></pre>
+    </div>
+
+    <div class="test">
+        <h2>Test 3: 平和島（04）1R - 非開催確認</h2>
+        <div id="test3-result"></div>
+        <pre id="test3-data"></pre>
+    </div>
+
+    <script>
+        const API_BASE = 'https://boatrace.shinta7023.workers.dev';
+        const today = '20260218';
+
+        async function testMikuni12R() {
+            try {
+                const response = await fetch(`${API_BASE}/api/odds/10/12?hd=${today}`);
+                const data = await response.json();
+                
+                document.getElementById('test1-data').textContent = JSON.stringify(data, null, 2);
+                
+                if (!data.success || !data.data) {
+                    document.getElementById('test1-result').innerHTML = '<span class="fail">❌ FAIL: APIエラー</span>';
+                    return;
+                }
+                
+                if (!data.data.hasRace) {
+                    document.getElementById('test1-result').innerHTML = '<span class="fail">❌ FAIL: レース開催なし（本日は開催されているはず）</span>';
+                    return;
+                }
+                
+                const odds = data.data.odds;
+                if (!odds || odds.length !== 6) {
+                    document.getElementById('test1-result').innerHTML = `<span class="fail">❌ FAIL: オッズ数が不正（${odds ? odds.length : 0}件）</span>`;
+                    return;
+                }
+                
+                // 1号艇のオッズチェック
+                const boat1 = odds[0];
+                const boat1OddsOK = boat1.oddsMin === 1.0 && boat1.oddsMax === 1.5;
+                
+                // 合計票数チェック
+                const totalTickets = odds.reduce((sum, boat) => sum + (boat.voteTickets || 0), 0);
+                const ticketsOK = totalTickets === 180;
+                
+                let result = '';
+                result += `<div>1号艇オッズ: ${boat1.oddsMin}-${boat1.oddsMax} `;
+                result += boat1OddsOK ? '<span class="pass">✅ PASS</span>' : '<span class="fail">❌ FAIL (期待値: 1.0-1.5)</span>';
+                result += '</div>';
+                
+                result += `<div>合計票数: ${totalTickets}票 `;
+                result += ticketsOK ? '<span class="pass">✅ PASS</span>' : '<span class="fail">❌ FAIL (期待値: 180票)</span>';
+                result += '</div>';
+                
+                if (boat1OddsOK && ticketsOK) {
+                    result += '<div style="margin-top: 10px;"><span class="pass">✅ 全チェック PASS - 本番データ取得成功！</span></div>';
+                }
+                
+                document.getElementById('test1-result').innerHTML = result;
+                
+            } catch (error) {
+                document.getElementById('test1-result').innerHTML = `<span class="fail">❌ ERROR: ${error.message}</span>`;
+                document.getElementById('test1-data').textContent = error.stack;
+            }
+        }
+
+        async function testToda() {
+            try {
+                const response = await fetch(`${API_BASE}/api/odds/02/1?hd=${today}`);
+                const data = await response.json();
+                
+                document.getElementById('test2-data').textContent = JSON.stringify(data, null, 2);
+                
+                if (!data.success || !data.data) {
+                    document.getElementById('test2-result').innerHTML = '<span class="fail">❌ FAIL: APIエラー</span>';
+                    return;
+                }
+                
+                const hasRace = data.data.hasRace;
+                
+                if (!hasRace) {
+                    document.getElementById('test2-result').innerHTML = '<span class="pass">✅ PASS - 非開催として正しく表示</span>';
+                } else {
+                    document.getElementById('test2-result').innerHTML = '<span class="fail">❌ FAIL: 開催されていると誤判定</span>';
+                }
+                
+            } catch (error) {
+                document.getElementById('test2-result').innerHTML = `<span class="fail">❌ ERROR: ${error.message}</span>`;
+                document.getElementById('test2-data').textContent = error.stack;
+            }
+        }
+
+        async function testHeiwaJima() {
+            try {
+                const response = await fetch(`${API_BASE}/api/odds/04/1?hd=${today}`);
+                const data = await response.json();
+                
+                document.getElementById('test3-data').textContent = JSON.stringify(data, null, 2);
+                
+                if (!data.success || !data.data) {
+                    document.getElementById('test3-result').innerHTML = '<span class="fail">❌ FAIL: APIエラー</span>';
+                    return;
+                }
+                
+                const hasRace = data.data.hasRace;
+                
+                if (!hasRace) {
+                    document.getElementById('test3-result').innerHTML = '<span class="pass">✅ PASS - 非開催として正しく表示</span>';
+                } else {
+                    document.getElementById('test3-result').innerHTML = '<span class="fail">❌ FAIL: 開催されていると誤判定</span>';
+                }
+                
+            } catch (error) {
+                document.getElementById('test3-result').innerHTML = `<span class="fail">❌ ERROR: ${error.message}</span>`;
+                document.getElementById('test3-data').textContent = error.stack;
+            }
+        }
+
+        async function runAllTests() {
+            await testMikuni12R();
+            await new Promise(r => setTimeout(r, 1000));
+            await testToda();
+            await new Promise(r => setTimeout(r, 1000));
+            await testHeiwaJima();
+        }
+
+        runAllTests();
+    </script>
+</body>
+</html>

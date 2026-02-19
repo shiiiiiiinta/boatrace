@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>BOATRACE API 実データ検証</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+        pre { background: #2d2d2d; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        .section { margin: 20px 0; }
+        h2 { color: #4ec9b0; }
+        .pass { color: #4ec9b0; }
+        .fail { color: #f48771; }
+        button { padding: 10px 20px; margin: 10px 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🔍 BOATRACE API 実データ検証</h1>
+    
+    <button onclick="testDirectFetch()">公式サイトに直接アクセステスト</button>
+    <button onclick="testWorkerAPI()">Worker API テスト</button>
+    
+    <div class="section">
+        <h2>1. 公式サイト直接アクセス（CORS制限あり）</h2>
+        <pre id="directResult">まだテストされていません</pre>
+    </div>
+    
+    <div class="section">
+        <h2>2. Worker API レスポンス</h2>
+        <pre id="workerResult">まだテストされていません</pre>
+    </div>
+    
+    <div class="section">
+        <h2>3. 検証結果</h2>
+        <pre id="validation">まだテストされていません</pre>
+    </div>
+
+    <script>
+        async function testDirectFetch() {
+            const result = document.getElementById('directResult');
+            result.textContent = '取得中...';
+            
+            try {
+                // 三国12R の公式URL
+                const url = 'https://www.boatrace.jp/owpc/pc/race/oddstf?jcd=10&rno=12&hd=20260218';
+                const response = await fetch(url, { mode: 'no-cors' });
+                
+                result.textContent = 'CORS制限により内容を確認できません。\n' +
+                                   'ブラウザで直接アクセスしてください:\n' + url;
+            } catch (error) {
+                result.textContent = `エラー: ${error.message}`;
+            }
+        }
+        
+        async function testWorkerAPI() {
+            const workerResult = document.getElementById('workerResult');
+            const validation = document.getElementById('validation');
+            
+            workerResult.textContent = '取得中...';
+            validation.textContent = '検証中...';
+            
+            try {
+                const response = await fetch('https://boatrace.shinta7023.workers.dev/api/odds/10/12?hd=20260218');
+                const data = await response.json();
+                
+                workerResult.textContent = JSON.stringify(data, null, 2);
+                
+                // 検証
+                let validationText = '=== 検証結果 ===\n\n';
+                
+                if (!data.success) {
+                    validationText += '❌ API呼び出し失敗\n';
+                    validation.textContent = validationText;
+                    return;
+                }
+                
+                const responseData = data.data;
+                
+                if (!responseData || !responseData.odds) {
+                    validationText += '❌ オッズデータなし\n';
+                    validation.textContent = validationText;
+                    return;
+                }
+                
+                // 総投票数の確認
+                const totalVotes = responseData.odds.reduce((sum, boat) => sum + (boat.voteTickets || 0), 0);
+                const totalAmount = responseData.odds.reduce((sum, boat) => sum + (boat.voteAmount || 0), 0);
+                
+                validationText += `総投票数: ${totalVotes} 票\n`;
+                validationText += `期待値: 180 票\n`;
+                validationText += totalVotes === 180 ? '✅ 合格\n\n' : '❌ 不合格\n\n';
+                
+                validationText += `総発売金額: ${totalAmount} 円 (${Math.floor(totalAmount / 100)} 百円)\n`;
+                validationText += `期待値: 18,000 円 (180 百円)\n`;
+                validationText += totalAmount === 18000 ? '✅ 合格\n\n' : '❌ 不合格\n\n';
+                
+                validationText += '--- 各艇の詳細 ---\n';
+                responseData.odds.forEach(boat => {
+                    validationText += `${boat.boatNumber}号艇:\n`;
+                    validationText += `  オッズ: ${boat.oddsMin || boat.odds} - ${boat.oddsMax || boat.odds}\n`;
+                    validationText += `  票数: ${boat.voteTickets || 0}\n`;
+                    validationText += `  金額: ${boat.voteAmount || 0} 円\n\n`;
+                });
+                
+                // 判定
+                if (totalVotes === 0 && totalAmount === 0) {
+                    validationText += '\n🔴 結論: Worker は票数・金額を全く取得できていません\n';
+                    validationText += '\n原因: BOATRACE公式サイトのHTML構造が想定と異なる、\n';
+                    validationText += 'または公式サイトが複勝の票数・金額データを提供していない可能性があります。\n';
+                    validationText += '\n対応: 公式サイトのHTMLを直接確認する必要があります。';
+                } else if (totalVotes !== 180 || totalAmount !== 18000) {
+                    validationText += '\n🟡 結論: Worker はデータを取得していますが、値が正しくありません\n';
+                    validationText += '\nパース処理のロジックを修正する必要があります。';
+                } else {
+                    validationText += '\n🟢 結論: 完璧です！全てのデータが正しく取得できています。';
+                }
+                
+                validation.textContent = validationText;
+                console.log('Full data:', data);
+                
+            } catch (error) {
+                workerResult.textContent = `エラー: ${error.message}\n${error.stack}`;
+                validation.textContent = `検証失敗: ${error.message}`;
+            }
+        }
+        
+        // 自動実行
+        window.addEventListener('load', () => {
+            testWorkerAPI();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOATRACE HTML Structure Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        h2 { color: #333; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+        .test-section { margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 4px; }
+        .url { background: #e0e0e0; padding: 10px; border-radius: 4px; margin: 10px 0; word-break: break-all; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; max-height: 600px; overflow-y: auto; font-size: 12px; }
+        .status { display: inline-block; padding: 5px 10px; border-radius: 4px; font-weight: bold; margin: 10px 0; }
+        .success { background: #4caf50; color: white; }
+        .error { background: #f44336; color: white; }
+        .info { background: #2196f3; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 BOATRACE HTML Structure Analysis</h1>
+        
+        <div class="test-section">
+            <h2>Test 1: 三国（10）12R - 複勝オッズ</h2>
+            <div class="url" id="mikuni-url"></div>
+            <div id="mikuni-status"></div>
+            <div><strong>Expected:</strong> 1号艇 1.0-1.5, 合計180票</div>
+            <pre id="mikuni-html"></pre>
+            <h3>Extracted Data:</h3>
+            <pre id="mikuni-data"></pre>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 2: 戸田（02）1R - 非開催確認</h2>
+            <div class="url" id="toda-url"></div>
+            <div id="toda-status"></div>
+            <pre id="toda-html"></pre>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 3: 桐生（01）1R - 開催場の確認</h2>
+            <div class="url" id="kiryu-url"></div>
+            <div id="kiryu-status"></div>
+            <pre id="kiryu-html"></pre>
+            <h3>Extracted Data:</h3>
+            <pre id="kiryu-data"></pre>
+        </div>
+    </div>
+
+    <script>
+        const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+        async function fetchHTML(jcd, rno, targetId) {
+            const url = `https://www.boatrace.jp/owpc/pc/race/oddstf?jcd=${jcd}&rno=${rno}&hd=${today}`;
+            const urlElement = document.getElementById(`${targetId}-url`);
+            const statusElement = document.getElementById(`${targetId}-status`);
+            const htmlElement = document.getElementById(`${targetId}-html`);
+            
+            urlElement.textContent = `GET ${url}`;
+            statusElement.innerHTML = '<span class="status info">Fetching...</span>';
+            
+            try {
+                // Worker経由でHTMLを取得
+                const workerUrl = `https://boatrace.shinta7023.workers.dev/api/odds/${jcd}/${rno}?hd=${today}`;
+                const response = await fetch(workerUrl);
+                const data = await response.json();
+                
+                statusElement.innerHTML = `<span class="status ${response.ok ? 'success' : 'error'}">Status: ${response.status}</span>`;
+                
+                // レスポンス全体を表示
+                htmlElement.textContent = JSON.stringify(data, null, 2);
+                
+                return data;
+            } catch (error) {
+                statusElement.innerHTML = `<span class="status error">Error: ${error.message}</span>`;
+                htmlElement.textContent = error.stack;
+                return null;
+            }
+        }
+
+        async function analyzeOdds(data, targetId) {
+            const dataElement = document.getElementById(`${targetId}-data`);
+            
+            if (!data || !data.success) {
+                dataElement.textContent = 'No data or failed response';
+                return;
+            }
+            
+            if (!data.data || !data.data.hasRace) {
+                dataElement.textContent = '本日のレース開催はありません';
+                return;
+            }
+            
+            const odds = data.data.odds;
+            if (!odds || odds.length === 0) {
+                dataElement.textContent = 'No odds data';
+                return;
+            }
+            
+            let analysis = `Race: ${data.data.raceNumber}R\n`;
+            analysis += `Odds count: ${odds.length}\n\n`;
+            
+            let totalTickets = 0;
+            odds.forEach(boat => {
+                const oddsDisplay = boat.oddsMin !== undefined && boat.oddsMax !== undefined
+                    ? `${boat.oddsMin}-${boat.oddsMax}`
+                    : boat.odds || 'N/A';
+                
+                analysis += `${boat.boatNumber}号艇: オッズ ${oddsDisplay}, 票数 ${boat.voteTickets || 0}\n`;
+                totalTickets += boat.voteTickets || 0;
+            });
+            
+            analysis += `\n合計票数: ${totalTickets}票`;
+            
+            if (data.data.note) {
+                analysis += `\n\n⚠️ Note: ${data.data.note}`;
+            }
+            
+            dataElement.textContent = analysis;
+        }
+
+        async function runTests() {
+            // Test 1: 三国12R
+            console.log('Testing 三国 12R...');
+            const mikuniData = await fetchHTML('10', '12', 'mikuni');
+            if (mikuniData) {
+                await analyzeOdds(mikuniData, 'mikuni');
+            }
+            
+            await new Promise(r => setTimeout(r, 1000));
+            
+            // Test 2: 戸田1R（非開催）
+            console.log('Testing 戸田 1R...');
+            await fetchHTML('02', '1', 'toda');
+            
+            await new Promise(r => setTimeout(r, 1000));
+            
+            // Test 3: 桐生1R
+            console.log('Testing 桐生 1R...');
+            const kiryuData = await fetchHTML('01', '1', 'kiryu');
+            if (kiryuData) {
+                await analyzeOdds(kiryuData, 'kiryu');
+            }
+        }
+
+        runTests();
+    </script>
+</body>
+</html>

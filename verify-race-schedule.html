@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>開催チェック - 平和島・宮島</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .venue-name {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 開催チェック - 平和島・宮島</h1>
+    <p><strong>目的</strong>: 2026-02-18（昨日）に平和島（04）と宮島（17）が開催されていたか確認</p>
+    
+    <button onclick="checkVenue('04', '平和島')">平和島（04）をチェック</button>
+    <button onclick="checkVenue('17', '宮島')">宮島（17）をチェック</button>
+    <button onclick="checkAllVenues()">全24場チェック</button>
+    
+    <div id="results"></div>
+    
+    <script>
+        const API_BASE_URL = 'https://boatrace.shinta7023.workers.dev';
+        const TEST_DATE = '20260218'; // 2026-02-18
+        
+        async function checkVenue(jcd, name) {
+            const resultsDiv = document.getElementById('results');
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `<div class="venue-name">${name}（${jcd}）</div><p>チェック中...</p>`;
+            resultsDiv.appendChild(section);
+            
+            try {
+                // レーススケジュール取得
+                const scheduleUrl = `${API_BASE_URL}/api/race-schedule/${jcd}?hd=${TEST_DATE}`;
+                console.log(`Fetching: ${scheduleUrl}`);
+                
+                const response = await fetch(scheduleUrl);
+                const data = await response.json();
+                
+                console.log(`${name} schedule:`, data);
+                
+                let html = '';
+                
+                if (data.success && data.data) {
+                    if (data.data.hasSchedule && data.data.races && data.data.races.length > 0) {
+                        html += `<div class="result success">
+                            ✅ 開催あり（${data.data.races.length}レース）<br>
+                            レース一覧: ${data.data.races.map(r => r.raceNumber + 'R').join(', ')}
+                        </div>`;
+                    } else {
+                        html += `<div class="result error">
+                            ❌ 開催なし（hasSchedule: ${data.data.hasSchedule}）
+                        </div>`;
+                    }
+                } else {
+                    html += `<div class="result error">
+                        ❌ エラー: ${data.error || 'Unknown error'}
+                    </div>`;
+                }
+                
+                // オッズデータも確認
+                const oddsUrl = `${API_BASE_URL}/api/odds/${jcd}/1?hd=${TEST_DATE}`;
+                const oddsResponse = await fetch(oddsUrl);
+                const oddsData = await oddsResponse.json();
+                
+                if (oddsData.success && oddsData.data && oddsData.data.hasRace) {
+                    html += `<div class="result success">
+                        ✅ 1Rオッズデータあり
+                    </div>`;
+                } else {
+                    html += `<div class="result error">
+                        ❌ 1Rオッズデータなし（hasRace: ${oddsData.data?.hasRace}）
+                    </div>`;
+                }
+                
+                section.innerHTML = `<div class="venue-name">${name}（${jcd}）</div>` + html;
+                
+            } catch (error) {
+                section.innerHTML = `<div class="venue-name">${name}（${jcd}）</div>
+                    <div class="result error">❌ エラー: ${error.message}</div>`;
+                console.error(error);
+            }
+        }
+        
+        async function checkAllVenues() {
+            const venues = {
+                '01': '桐生', '02': '戸田', '03': '江戸川', '04': '平和島',
+                '05': '多摩川', '06': '浜名湖', '07': '蒲郡', '08': '常滑',
+                '09': '津', '10': '三国', '11': 'びわこ', '12': '住之江',
+                '13': '尼崎', '14': '鳴門', '15': '丸亀', '16': '児島',
+                '17': '宮島', '18': '徳山', '19': '下関', '20': '若松',
+                '21': '芦屋', '22': '福岡', '23': '唐津', '24': '大村'
+            };
+            
+            document.getElementById('results').innerHTML = '';
+            
+            for (const [jcd, name] of Object.entries(venues)) {
+                await checkVenue(jcd, name);
+                await new Promise(resolve => setTimeout(resolve, 500)); // 0.5秒待機
+            }
+        }
+    </script>
+</body>
+</html>

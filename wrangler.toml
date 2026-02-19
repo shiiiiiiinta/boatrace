@@ -1,0 +1,18 @@
+name = "boatrace-odds-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Workers の開発環境設定
+workers_dev = true
+
+# アカウント情報（オプション - wrangler whoami で確認可能）
+# account_id = "your-account-id-here"
+
+# カスタムドメインを使用する場合（オプション）
+# routes = [
+#   { pattern = "api.yourdomain.com/*", zone_name = "yourdomain.com" }
+# ]
+
+# 環境変数（オプション）
+# [env.production]
+# vars = { ENVIRONMENT = "production" }
